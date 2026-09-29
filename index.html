@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FractoVue XR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A radiograph laid onto a full human skeleton; only fractured bones are cut and displaced; explorable in VR and AR.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="assets/UI/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1112">
+<link rel="apple-touch-icon" href="assets/UI/app/apple-touch-icon.png">
+</head>
+<body>
+<div class="grid-bg"></div>
+<div id="stage"></div>
+<div class="loading" id="loading"><span>LOADING SKELETON…</span></div>
+<div class="tooltip" id="tooltip" hidden></div>
+
+<header class="hud topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7"/><path d="M10 7c2 0 3 1.6 3 3.4v11.2c0 1.8 1 3.4 3 3.4s3-1.6 3-3.4V17l-2-1.4 2-1.6v-3.6C19 8.6 20 7 22 7"/></svg>
+    <div>
+      <h1>FractoVue <span>XR</span></h1>
+      <p class="eyebrow">One X-ray → laid onto the skeleton → only the fractures change → VR / AR</p>
+    </div>
+  </div>
+  <span class="disclaimer" title="Outputs are estimated visualisations for research and education. They are not a medical diagnosis.">Research prototype · not a diagnosis</span>
+</header>
+
+<aside class="hud panel" id="panel" aria-label="Workflow">
+  <button class="sheet-handle" id="sheet-handle" aria-label="Toggle workflow panel"><span></span></button>
+
+  <section class="step" id="step-region">
+    <h2><b>1</b>Anatomical region</h2>
+    <div class="chips" id="regions" role="group" aria-label="Region"></div>
+  </section>
+
+  <section class="step" id="step-bone">
+    <h2><b>2</b>Bone of interest</h2>
+    <div id="bones" class="bone-list"><p class="empty">Pick a region to list its bones.</p></div>
+  </section>
+
+  <section class="step" id="step-xray">
+    <h2><b>3</b>X-ray</h2>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/bmp">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <span>Drop an X-ray here or <u>browse</u></span>
+      <small>PNG / JPEG · one projection (AP or lateral)</small>
+    </label>
+    <button id="sample" class="ghost wide" disabled>Or generate a synthetic sample for this bone</button>
+    <div class="demos"><span>No X-ray at hand? Run a demo:</span>
+      <button class="link" data-demo="femur">Left femur, simulated fracture →</button>
+      <button class="link" data-demo="radius">Left radius, simulated fracture →</button></div>
+    <div class="preview" id="preview" hidden>
+      <canvas id="preview-canvas"></canvas>
+      <div class="roi" id="roi" hidden></div>
+      <div class="pin" id="pin" hidden></div>
+      <span class="preview-mode" id="preview-mode" hidden></span>
+    </div>
+    <div class="opts" id="opts" hidden>
+      <div class="seg" role="radiogroup" aria-label="Projection">
+        <span class="lab">Projection</span>
+        <button data-proj="AP" aria-pressed="true">AP</button>
+        <button data-proj="LAT" aria-pressed="false">Lateral</button>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="Fracture detector">
+        <span class="lab">Detector</span>
+        <button data-det="gated" aria-pressed="true">Built-in + your model</button>
+        <button data-det="learned" aria-pressed="false">Your model</button>
+        <button data-det="builtin" aria-pressed="false">Built-in</button>
+      </div>
+      <p class="note" id="det-note"></p>
+      <div class="tool-row">
+        <button class="mini" id="crop-btn" aria-pressed="false">Crop to bone</button>
+        <button class="mini" id="mark-btn" aria-pressed="false">Mark fracture</button>
+        <button class="mini" id="clear-btn">Clear marks</button>
+        <label class="check"><input type="checkbox" id="invert"> Inverted image</label>
+      </div>
+      <div class="engine" id="engine-row">
+        <span class="lab">Engine</span>
+        <span id="engine-name">In-browser (classical CV)</span>
+        <label class="check" id="engine-toggle" hidden><input type="checkbox" id="use-backend" checked> Use Python backend</label>
+      </div>
+    </div>
+    <button id="analyze" class="primary wide" disabled>Analyze X-ray</button>
+    <p class="note" id="xray-note">A single radiograph is a 2D projection: the fracture is found on the film and applied to the matching skeleton bone. Only in-plane displacement can be measured.</p>
+  </section>
+
+  <section class="step" id="step-pipeline" hidden>
+    <h2><b>4</b>Pipeline</h2>
+    <ol class="stages" id="stages"></ol>
+  </section>
+
+  <section class="step" id="step-result" hidden>
+    <h2><b>5</b>Result</h2>
+    <div class="result" id="result"></div>
+    <div class="group-label">Affected bone</div>
+    <div class="seg full" id="bone-display">
+      <button data-display="generic">Generic</button>
+      <button data-display="patient" aria-pressed="true">Patient</button>
+      <button data-display="both">Both</button>
+    </div>
+    <div class="group-label">Visualisation</div>
+    <div class="modes" id="modes"></div>
+    <div class="group-label">X-ray placement</div>
+    <div class="seg full" id="xray-place">
+      <button data-place="behind" aria-pressed="true">Behind bone (registered)</button>
+      <button data-place="beside">Beside</button>
+    </div>
+    <div class="legend" id="legend" hidden>
+      <span><i style="background:#f59e38"></i>Fracture zone (observed in the film plane)</span>
+      <span><i style="background:#4dd1e0"></i>Displaced fragment (moved as measured)</span>
+      <span><i style="background:#8a8a8a"></i>Unchanged skeleton bone</span>
+    </div>
+    <p class="note warn">The skeleton is the reference: only fractured bones are cut and moved, using what one projection shows. Out-of-plane displacement is not visible and is not modelled. Not for diagnosis or treatment decisions.</p>
+  </section>
+</aside>
+
+<nav class="hud tools" aria-label="View controls">
+  <button class="icon-btn" data-act="zoomIn" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M11 8v6M8 11h6M16 16l4 4"/></svg></button>
+  <button class="icon-btn" data-act="zoomOut" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M8 11h6M16 16l4 4"/></svg></button>
+  <button class="icon-btn" data-act="reset" title="Reset view" aria-label="Reset view"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
+  <button class="icon-btn" data-act="fit" title="Fit skeleton" aria-label="Fit skeleton"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button class="icon-btn accent" data-act="focusFracture" title="Focus fracture" aria-label="Focus fracture" disabled><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+  <button class="icon-btn" data-act="toggleRotate" data-state="rotating" title="Auto-rotate" aria-label="Auto-rotate" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/></svg></button>
+  <div class="sep"></div>
+  <button class="tog" data-act="toggleSkeleton" data-show="skeleton" aria-pressed="true">Skeleton</button>
+  <button class="tog" data-act="togglePatient" data-show="patient" aria-pressed="true" disabled>Patient bone</button>
+  <button class="tog" data-act="toggleFracture" data-show="fracture" aria-pressed="true" disabled>Fracture</button>
+  <button class="tog" data-act="toggleXray" data-show="xray" aria-pressed="false" disabled>X-ray</button>
+</nav>
+
+<div class="hud info" id="info" aria-live="polite" hidden>
+  <span class="tag" id="info-tag">Selected bone</span>
+  <span class="name" id="info-name"></span>
+  <dl id="info-rows"></dl>
+  <p class="fact" id="info-fact"></p>
+</div>
+
+<footer class="hud xrbar">
+  <div class="xr-btns">
+    <button class="xr-btn" id="vr-btn" disabled><svg viewBox="0 0 24 24"><path d="M3 8h18v8h-6l-2-3h-2l-2 3H3z"/></svg>Enter VR</button>
+    <button class="xr-btn" id="ar-btn" disabled><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>Enter AR</button>
+  </div>
+  <span class="xr-note" id="xr-note">Checking for WebXR…</span>
+</footer>
+
+<dialog class="stage-modal" id="stage-modal">
+  <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+  <div class="modal-body">
+    <div class="modal-img" id="modal-img"></div>
+    <div class="modal-meta">
+      <span class="basis" id="modal-basis"></span>
+      <h3 id="modal-title"></h3>
+      <p id="modal-summary"></p>
+      <dl id="modal-metrics"></dl>
+    </div>
+  </div>
+</dialog>
+
+<!-- WebXR DOM overlay for phone AR -->
+<div id="ar-overlay" hidden>
+  <div class="ar-top">
+    <div class="ar-card"></div>
+    <p class="ar-status" id="ar-status"></p>
+  </div>
+  <div class="ar-bottom">
+    <div class="ar-row">
+      <button data-ar="focus" class="accent">Focus fracture</button>
+      <button data-ar="zin" aria-label="Zoom in">＋</button>
+      <button data-ar="zout" aria-label="Zoom out">－</button>
+      <button data-ar="reset">Reset</button>
+      <button data-ar="drag">Drag: rotate</button>
+    </div>
+    <div class="ar-row">
+      <button data-ar-toggle="skeleton">Skeleton</button>
+      <button data-ar-toggle="patient">Patient</button>
+      <button data-ar-toggle="fracture">Fracture</button>
+      <button data-ar-toggle="xray">X-ray</button>
+      <button data-ar="life" aria-pressed="false">1:1</button>
+      <button data-ar="replace">Re-place</button>
+      <button data-ar="exit" class="exit">Exit AR</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/build/three.module.js",
+  "three/addons/": "./vendor/three/examples/jsm/"
+} }
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

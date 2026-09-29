@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "FractoVue XR",
+  "short_name": "FractoVue",
+  "description": "One X-ray laid onto a full human skeleton: the fractured bone is broken where the film shows it, explorable in VR and AR. Research prototype, not a diagnostic device.",
+  "start_url": "./?source=app",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1112",
+  "theme_color": "#0b1112",
+  "categories": ["medical", "education"],
+  "icons": [
+    { "src": "assets/UI/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/UI/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/UI/app/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "assets/UI/app/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
