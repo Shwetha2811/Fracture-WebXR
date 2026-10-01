@@ -119,5 +119,5 @@ fracture. With only 10 held-out healthy images, the false-alarm rate on other no
 
 ## Credits
 
-* Fracture model: trained by the repository owner on HBFMID. YOLOv8 by Ultralytics (AGPL-3.0).
+* Fracture model: trained by [Shwetha2811](https://github.com/Shwetha2811) on HBFMID. YOLOv8 by Ultralytics (AGPL-3.0).
 * 3D rendering: three.js (MIT). Inference: ONNX Runtime Web (MIT).
